@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuvem de Palavras</title>
+<script src="sq-mural.js"></script><script src="qrcode.js"></script>
+<style>
+:root{--bg:#0f1a1f;--ink:#eef4f6;--mute:#93a7b0;--acc:#4fc1cf;--line:#26383f;--red:#f08a76}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,"Segoe UI",Arial,sans-serif;overflow:hidden}
+header{height:14vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:0 2vw}
+h1{margin:0;font-size:clamp(28px,4.4vw,70px);line-height:1.1}
+.sub{color:var(--mute);font-size:clamp(14px,1.6vw,28px);margin-top:.5vh}
+main{height:78vh;display:flex;gap:2vw;padding:0 2vw}
+aside{width:min(30vw,420px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1.4vh}
+.qrbox{background:#fff;border-radius:16px;padding:10px;line-height:0}
+.qrbox svg{width:min(26vw,360px);height:auto}
+aside p{margin:0;font-size:clamp(16px,1.7vw,30px)}
+.qrurl{color:var(--mute);font-size:clamp(12px,1.1vw,20px)!important;word-break:break-all}
+#stage{position:relative;flex:1}
+#stage span{position:absolute;white-space:nowrap;font-weight:800;line-height:1;cursor:pointer}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:clamp(22px,3vw,48px)}
+footer{height:8vh;display:flex;align-items:center;justify-content:space-between;padding:0 2vw;color:var(--mute);font-size:clamp(14px,1.3vw,22px)}
+footer button,footer select{background:transparent;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:inherit;cursor:pointer;margin-left:8px}
+footer select option{background:var(--bg)}
+@media (max-width:700px){main{flex-direction:column}aside{width:100%;flex-direction:row}.qrbox svg{width:120px}}
+</style>
+</head>
+<body>
+<header><h1>O que você mudaria na nossa escola?</h1><div class="sub">Projeto de Vida · 9º ano · Aula 06 · Projetos que transformam a comunidade escolar</div></header>
+<main>
+  <aside><div class="qrbox"></div><p>Leia o QR code, preencha nome e turma e envie até 3 palavras.</p><p class="qrurl"></p></aside>
+  <div id="stage"><div id="empty">As palavras aparecerão aqui.</div></div>
+</main>
+<footer><span><b id="tot">0 estudantes</b> · <span id="tvCon">conectando...</span></span>
+<span><select id="tvTurma"><option value="">Todas as turmas</option></select><button id="fsb">Tela cheia</button><button id="clr">Limpar nuvem</button><button id="unh">Mostrar ocultas</button></span></footer>
+<script>
+(function(){
+/* Arquivo do quiz dentro da pasta quizzes/ */
+const QUIZ_ARQ='9o_ANO/9o_PV_AULA_06_PROJETOS.html';
+/* identificador da nuvem desta aula */
+const AULA_ID='pv9a06';
+const COLORS=['#4fc1cf','#f0a35c','#8fd694','#f2d16b','#e38ab5','#9db7ff','#ff8f70','#7fe0c8'];
+const $=id=>document.getElementById(id), stage=$('stage');
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+const normT=t=>String(t||'').toUpperCase().replace(/[\sº°ª\.\-]/g,'');
+const normW=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,'').trim();
+let NV=lsGet('pv9a06_tv_nuvem')||{}, hidden=lsGet('pv9a06_tv_ocultas')||[], lastKey='';
+
+function turmas(){const sel=$('tvTurma'),cur=sel.value,ts=[...new Set(Object.values(NV).map(x=>x.t).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todas as turmas</option>'+ts.map(t=>'<option'+(t===cur?' selected':'')+'>'+t+'</option>').join('');}
+function draw(){
+  const tf=$('tvTurma').value,freq={};let n=0;
+  Object.values(NV).forEach(x=>{if(tf&&x.t!==tf)return;n++;x.w.forEach(w=>{const k=normW(w);if(!k||hidden.includes(k))return;if(!freq[k])freq[k]={w,n:0};freq[k].n++;});});
+  $('tot').textContent=n+(n===1?' estudante':' estudantes');
+  const list=Object.entries(freq).sort((a,b)=>b[1].n-a[1].n).slice(0,60);
+  const key=JSON.stringify([tf,stage.clientWidth,stage.clientHeight,list.map(x=>[x[0],x[1].n])]);if(key===lastKey)return;lastKey=key;
+  stage.innerHTML='';
+  if(!list.length){stage.innerHTML='<div id="empty">As palavras aparecerão aqui.</div>';return;}
+  const W=stage.clientWidth,H=stage.clientHeight,max=list[0][1].n;let scale=1;
+  for(let attempt=0;attempt<6;attempt++){
+    stage.innerHTML='';const placed=[];let fail=false;
+    list.forEach(([k,o],i)=>{
+      const s=document.createElement('span');s.textContent=o.w;s.title=o.n+' · clique para ocultar';
+      s.style.fontSize=Math.round((34+(H*0.22-34)*Math.sqrt(o.n/max))*scale)+'px';s.style.color=COLORS[i%COLORS.length];
+      s.onclick=()=>{if(confirm('Ocultar "'+o.w+'" da nuvem?')){hidden.push(k);lsSet('pv9a06_tv_ocultas',hidden);lastKey='';draw();}};
+      stage.appendChild(s);const w=s.offsetWidth,h=s.offsetHeight;let ok=false;
+      for(let a=0;a<2400;a++){const ang=a*0.18,rad=2.2*ang;const x=W/2+rad*Math.cos(ang)*(W/H)-w/2,y=H/2+rad*Math.sin(ang)-h/2;
+        if(x<0||y<0||x+w>W||y+h>H)continue;
+        if(placed.every(p=>x+w+8<p.x||p.x+p.w+8<x||y+h+4<p.y||p.y+p.h+4<y)){s.style.left=x+'px';s.style.top=y+'px';placed.push({x,y,w,h});ok=true;break;}}
+      if(!ok){s.remove();fail=true;}
+    });
+    if(!fail)break;scale*=0.85;
+  }
+}
+function init(){
+  const H={};location.hash.slice(1).split('&').forEach(p=>{const i=p.indexOf('=');if(i>0)H[p.slice(0,i)]=decodeURIComponent(p.slice(i+1));});
+  if(!window.SQMural||!window.qrcode){document.querySelector('.qrbox').innerHTML='<div style="width:300px;height:300px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#b3341f;text-align:center;line-height:1.3">Abra este arquivo pelo GitHub Pages</div>';$('tvCon').textContent='sem conexão';return;}
+  const cod=H.s||SQMural.salaPadrao();
+  const SALA=new SQMural.Sala(cod,H.m?H.m.split(','):null,n=>{$('tvCon').textContent=n?'● conectado':'○ conectando...';});
+  const PFX=SALA.topico('pvnuvem/'+AULA_ID+'/');
+  SALA.murais.forEach(m=>{const o=m.subs;m.subs=new Proxy(o,{get:(t,k)=>{if(k in t)return t[k];if(typeof k==='string'&&k.indexOf(PFX)===0)return t[PFX+'+'];return undefined;}});});
+  SALA.ouvir('pvnuvem/'+AULA_ID+'/+',o=>{if(!o||!Array.isArray(o.palavras))return;const corte=+(lsGet('pv9a06_tv_corte')||0);if((+o.t||0)<corte)return;
+    NV[o.cid||o.mid]={t:normT(o.turma),n:String(o.nome||''),w:o.palavras.slice(0,3).map(w=>String(w).toLowerCase().trim().slice(0,25)).filter(Boolean)};
+    lsSet('pv9a06_tv_nuvem',NV);turmas();draw();});
+  const base=new URL('./',location.href).href;
+  const link=base+'#'+(cod!==SQMural.salaPadrao()?'s='+cod+'&':'')+'q='+encodeURIComponent(QUIZ_ARQ)+(H.m?'&m='+H.m:'');
+  try{const q=qrcode(0,'M');q.addData(link);q.make();document.querySelector('.qrbox').innerHTML=q.createSvgTag(8,2);}catch(e){document.querySelector('.qrbox').textContent='QR indisponível';}
+  document.querySelector('.qrurl').textContent=base.replace(/^https?:\/\//,'');
+}
+$('tvTurma').onchange=()=>{lastKey='';draw();};
+$('clr').onclick=()=>{if(confirm('Apagar todas as palavras da nuvem?')){NV={};lsSet('pv9a06_tv_nuvem',NV);lsSet('pv9a06_tv_corte',Date.now());turmas();lastKey='';draw();}};
+$('unh').onclick=()=>{hidden=[];lsSet('pv9a06_tv_ocultas',hidden);lastKey='';draw();};
+$('fsb').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();};
+addEventListener('resize',()=>{lastKey='';draw();});
+turmas();draw();init();
+})();
+</script>
+</body>
+</html>

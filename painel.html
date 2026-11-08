@@ -309,6 +309,7 @@ tr.linha{cursor:pointer}
     <h1>Painel do professor <span class="vivo off" id="vivo" title="Murais conectados"><i></i><span>conectando…</span></span></h1>
     <nav class="abas" aria-label="Seções"><button type="button" id="tPainel" class="on">Painel</button><button type="button" id="tQuiz">Quizzes disponíveis</button><button type="button" id="bRes">Resultados</button></nav>
     <button class="botao pri" id="bMsgTodos" type="button">Mensagem</button>
+    <button class="botao" id="bPastaRes" type="button" title="Pasta do computador onde ficam salvos os resultados que os estudantes enviam">Escolher pasta dos resultados</button>
     <button class="botao" id="bConfig" type="button" title="Configurações">Configurações</button>
   </div>
 </header>
@@ -537,7 +538,7 @@ function processar(e,ua){
       if(d.colagens>0&&(!ant||ant.colagens<d.colagens))f='colou texto numa resposta escrita';else if(d.bloqueadas>0&&(!ant||ant.bloqueadas<d.bloqueadas))f='tentou colar numa resposta escrita';break;
     default:var t=String(e.tipo||'').toLowerCase().slice(0,40);if(!t)return;evento(c,t,e.dados);
       if(t==='resposta')f='respondeu'+(e.dados&&e.dados.questao!=null?' a questão '+e.dados.questao:'')+(e.dados&&typeof e.dados.correta==='boolean'?(e.dados.correta?' — acertou':' — errou'):'');
-      else if(t==='alerta')f='alerta'+(e.dados&&e.dados.motivo?': '+e.dados.motivo:'');else if(t==='conclusao')f='concluiu o quiz';
+      else if(t==='alerta')f='alerta'+(e.dados&&e.dados.motivo?': '+e.dados.motivo:'');else if(t==='conclusao')f='concluiu o quiz';else if(t==='resultado'){f='enviou o resultado ao professor';sqResultado(c,e.dados)}
   }
   var depois=resumir(c);
   if(!f){if(antes.nome!==depois.nome&&depois.nome.indexOf('(sem nome)')!==0)f='identificou-se como '+depois.nome;
@@ -786,6 +787,47 @@ $('cSalvar').onclick=function(){
 };
 $('bAtualizar').onclick=carregarQuizzes;
 
+/* ---------- resultados enviados pelos estudantes: salvos numa pasta do computador ---------- */
+var pastaH=null,RES=ler('sq_resultados',1)||{},PEND=ler('sq_res_pend',1)||[];
+function idb(){return new Promise(function(ok,no){var r=indexedDB.open('sq_pasta',1);r.onupgradeneeded=function(){r.result.createObjectStore('h')};r.onsuccess=function(){ok(r.result)};r.onerror=no})}
+function idbGet(){return idb().then(function(db){return new Promise(function(ok){var t=db.transaction('h').objectStore('h').get('pasta');t.onsuccess=function(){ok(t.result||null)};t.onerror=function(){ok(null)}})}).catch(function(){return null})}
+function idbSet(h){return idb().then(function(db){db.transaction('h','readwrite').objectStore('h').put(h,'pasta')}).catch(function(){})}
+async function permOk(){if(!pastaH)return false;try{return(await pastaH.queryPermission({mode:'readwrite'}))==='granted'}catch(e){return false}}
+async function pastaBtn(){var b=$('bPastaRes');if(!b)return;
+  if(!window.showDirectoryPicker){b.textContent='Pasta: abra no Chrome ou Edge';return}
+  var ok=await permOk(),pend=PEND.length?' ('+PEND.length+' a salvar)':'';
+  b.textContent=!pastaH?'Escolher pasta dos resultados'+pend:ok?'Pasta: '+pastaH.name+pend:'Reconectar pasta: '+pastaH.name+pend;
+  b.classList.toggle('pri',!ok)}
+function nomeArq(s){return String(s||'').replace(/[\\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90)||'sem nome'}
+async function escrever(dir,nome,txt){var f=await dir.getFileHandle(nome,{create:true});var w=await f.createWritable();await w.write(txt);await w.close()}
+function relHTML(it){var r=it.relatorio||{},h='';
+  (r.blocos||[]).forEach(function(b){h+='<h2>'+esc(b[0])+'</h2><table>'+(b[1]||[]).map(function(x){return'<tr><th>'+esc(x[0])+'</th><td>'+esc(x[1])+'</td></tr>'}).join('')+'</table>'});
+  h+='<h2>Alertas em ordem cronológica</h2>'+((r.alertas||[]).length?'<table><tr><th>Horário</th><th>Tipo</th></tr>'+r.alertas.map(function(a){return'<tr><td>'+esc(a[0])+'</td><td>'+esc(a[1])+'</td></tr>'}).join('')+'</table>':'<p>Nenhum alerta.</p>');
+  if((r.questoes||[]).length)h+='<h2>Questões</h2><table><tr><th>Nº no gabarito</th><th>1ª tentativa</th><th>Tentativas</th><th>Seção</th></tr>'+r.questoes.map(function(q){return'<tr><td>'+esc(q[0])+'</td><td>'+esc(q[1])+'</td><td>'+esc(q[2])+'</td><td>'+esc(q[3])+'</td></tr>'}).join('')+'</table>';
+  h+='<h2>Seções para revisar</h2>'+((r.revisar||[]).length?'<ul>'+r.revisar.map(function(s){return'<li>'+esc(s)+'</li>'}).join('')+'</ul>':'<p>Nenhuma.</p>');
+  if(r.registro)h+='<h2>Verificação</h2><p><b>Registro:</b> '+esc(r.registro)+'</p><p><b>Código:</b> '+esc(r.codigo||it.codigo||'')+'</p>';
+  return'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>'+esc(it.nome)+' - '+esc(r.titulo||it.quiz)+'</title><style>@page{margin:1cm}body{font:14px/1.5 Arial,sans-serif;color:#1f2937;margin:1cm}h1{background:#0b6b78;color:#fff;padding:12px;border-radius:8px;font-size:20px;margin:0 0 4px}h2{color:#0b6b78;font-size:16px;border-bottom:1px solid #d6dde1;padding-bottom:3px;margin-top:18px}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #e5e9ec;padding:4px 6px;vertical-align:top}th{width:40%;color:#5b6572}.sub{color:#5b6572;margin:0 0 10px}</style></head><body>'+
+    '<h1>Relatório: '+esc(r.titulo||it.quiz)+'</h1><p class="sub">'+esc(r.cab||'')+' · Recebido em '+new Date(it.recebido).toLocaleString('pt-BR')+'</p>'+h+'</body></html>'}
+function csvCel(x){return'"'+String(x==null?'':x).replace(/"/g,'""')+'"'}
+async function gravar(it){var d=await pastaH.getDirectoryHandle(nomeArq(String(it.quiz).split('/').pop().replace(/\.html?$/i,'')),{create:true});
+  await escrever(d,nomeArq((it.turma||'')+' - '+(it.nome||''))+'.html',relHTML(it));
+  var l=Object.keys(RES).map(function(k){return RES[k]}).filter(function(r){return r.quiz===it.quiz}).sort(function(a,b){return(a.turma+a.nome).localeCompare(b.turma+b.nome,'pt-BR')});
+  await escrever(d,'resumo.csv','﻿'+['Estudante','Turma','Nota','Total de questões','Respostas','Acertos','Erros','Alertas','Início','Fim','Código','Recebido em'].map(csvCel).join(';')+'\r\n'+
+    l.map(function(r){return[r.nome,r.turma,r.nota,r.total,r.respostas,r.acertos,r.erros,r.alertas,r.inicio,r.fim,r.codigo,new Date(r.recebido).toLocaleString('pt-BR')].map(csvCel).join(';')}).join('\r\n'))}
+var salvando=false;
+async function descarregarRes(){if(salvando||!PEND.length||!(await permOk())){pastaBtn();return 0}salvando=true;var n=0;
+  try{while(PEND.length){var it=RES[PEND[0]];if(it){try{await gravar(it);n++}catch(e){toast('Não foi possível salvar na pasta: '+(e&&e.message||e));break}}PEND.shift();guardar('sq_res_pend',PEND)}}finally{salvando=false}
+  pastaBtn();return n}
+function sqResultado(c,dados){if(!dados||typeof dados!=='object')return;var r=resumir(c);
+  var it={};Object.keys(dados).forEach(function(k){it[k]=dados[k]});it.quiz=c.quiz;it.nome=String(dados.nome||r.nome).slice(0,120);it.turma=String(dados.turma||r.turma||'').slice(0,40);it.recebido=Date.now();
+  var k=it.quiz+'|'+it.turma+'|'+it.nome;RES[k]=it;guardar('sq_resultados',RES);if(PEND.indexOf(k)<0)PEND.push(k);guardar('sq_res_pend',PEND);
+  descarregarRes().then(function(n){toast(n?'Resultado de '+it.nome+' salvo na pasta.':'Resultado de '+it.nome+' recebido. '+(pastaH?'Reconecte a pasta para salvar.':'Escolha a pasta para salvar.'))})}
+async function escolherPasta(){if(!window.showDirectoryPicker){toast('Para salvar numa pasta, abra o painel no Chrome ou no Edge.');return}
+  try{if(pastaH&&!(await permOk())){if((await pastaH.requestPermission({mode:'readwrite'}))==='granted'){var n=await descarregarRes();toast('Pasta reconectada.'+(n?' '+n+' resultado(s) salvo(s).':''));return}}
+    pastaH=await window.showDirectoryPicker({id:'sq-resultados',mode:'readwrite'});await idbSet(pastaH);var m=await descarregarRes();toast('Os resultados serão salvos em "'+pastaH.name+'".'+(m?' '+m+' salvo(s) agora.':''))}catch(e){}
+  pastaBtn()}
+$('bPastaRes').onclick=escolherPasta;
+idbGet().then(function(h){if(h)pastaH=h;pastaBtn();descarregarRes()});
 desenharAcesso();ligarBotoes(document.querySelector('#vPainel .cab'));carregarQuizzes();desenharTabela();desenharFeed();
 })();
 </script>
