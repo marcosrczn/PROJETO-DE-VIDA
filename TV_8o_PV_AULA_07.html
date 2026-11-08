@@ -351,7 +351,7 @@ function qIniciar(){
   const order=shuffle([...Array(N).keys()]);
   st={started:true,nome,turma,queue:order,seq:{},seen:0,first:{},tries:{},answered:0,errors:0,fast:0,pauses:0,apost:0,start:Date.now(),alerts:[],reloads:0,times:[],lastQuick:false,cur:null,done:false};
   save();try{window.ServidorQuiz&&ServidorQuiz.identificar({nome,turma})}catch(e){}
-  if(AB)document.documentElement.requestFullscreen().catch(()=>{});wasFS=true;proximo();
+  wasFS=true;proximo();
 }
 function proximo(){
   if(!st.nvOk&&!lsGet('pv8a07_nuvem_env'))return nvRender();
@@ -506,7 +506,6 @@ document.addEventListener('keydown',e=>{
   if(t){e.preventDefault();alerta(t)}});
 document.addEventListener('keyup',e=>{if(e.key==='PrintScreen'&&running()&&AB){alerta('Captura de tela');try{navigator.clipboard.writeText('')}catch(x){}}});
 let dtOpen=false;setInterval(()=>{if(!running()||!AB)return;const o=outerWidth-innerWidth>200||outerHeight-innerHeight>220;if(o&&!dtOpen)alerta('Possível abertura das ferramentas do desenvolvedor');dtOpen=o},2000);
-document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement){wasFS=true;return}if(wasFS&&running()&&AB&&curTab==='quiz')alerta('Saída da tela cheia');wasFS=false});
 /* uma aba só */
 function lockCheck(){if(!running())return true;const l=lsGet('pv8a07_lock');if(l&&l.id!==TAB_ID&&Date.now()-l.ts<5000)return false;lsSet('pv8a07_lock',{id:TAB_ID,ts:Date.now()});return true}
 setInterval(()=>{if(running()&&!blocked)lsSet('pv8a07_lock',{id:TAB_ID,ts:Date.now()})},2000);
@@ -543,7 +542,7 @@ else if(running()){
   if(!lockCheck()){blocked=true;st.alerts.push({t:Date.now(),tipo:'Quiz aberto em mais de uma aba'});save();document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif"><h2>O quiz já está aberto em outra aba.</h2><p>Feche esta aba e continue na outra.</p></div>'}
   else{st.reloads++;st.alerts.push({t:Date.now(),tipo:'Recarga da página'});save();
     $('qStart').style.display='none';
-    overlay('<h3>Você tem uma atividade em andamento</h3><p>'+esc(st.nome)+' · Turma '+esc(st.turma)+'</p><p style="text-align:center;margin-top:12px"><button class="btn grn" onclick="$(\'ov\').classList.remove(\'on\');tab(\'quiz\');if(AB)document.documentElement.requestFullscreen().catch(()=>{});render()">Continuar</button></p>',0)}
+    overlay('<h3>Você tem uma atividade em andamento</h3><p>'+esc(st.nome)+' · Turma '+esc(st.turma)+'</p><p style="text-align:center;margin-top:12px"><button class="btn grn" onclick="$(\'ov\').classList.remove(\'on\');tab(\'quiz\');render()">Continuar</button></p>',0)}
 }else if(MODE==='aluno'&&st&&st.done){$('qStart').style.display='none';$('qEnd').style.display='block';$('qEnd').innerHTML='<h2 style="color:var(--blue)">Atividade concluída</h2><p>Código de verificação: <span class="code">'+st.code+'</span></p><p style="margin-top:10px"><button class="btn" onclick="tab(\'rel\')">Ver relatório</button></p>'}
 </script>
 </body>
