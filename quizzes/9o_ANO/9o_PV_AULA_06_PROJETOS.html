@@ -148,7 +148,9 @@ function wait(html,sec,after){overlay=true;const o=$('#ov');o.style.display='fle
 function closeOv(){overlay=false;$('#ov').style.display='none';}
 function ovMsg(html){overlay=true;$('#ov').style.display='flex';$('#ovb').innerHTML=html;}
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',3500);}
-function alertR(type,msg){if(!running())return;S.alerts.push({t:Date.now(),type});save();toast(msg||('Alerta registrado: '+type));}
+function sqSend(t,d,u){try{if(window.ServidorQuiz)ServidorQuiz.enviar(t,d,!!u);}catch(e){}}
+function sqId(){try{if(window.ServidorQuiz&&S)ServidorQuiz.identificar({nome:S.nome,turma:S.turma});}catch(e){}}
+function alertR(type,msg){if(!running())return;S.alerts.push({t:Date.now(),type});save();sqSend('alerta',{motivo:type});toast(msg||('Alerta registrado: '+type));}
 
 /* ---------- Quiz ---------- */
 function newState(nome,turma){return{nome,turma,start:Date.now(),end:null,status:'run',queue:shuf([...Array(NQ).keys()]),cur:null,serial:0,seen:[],first:{},tries:{},done:[],ans:[],alerts:[],consults:[],pauses:0,reloads:0,fastRun:0,fastTotal:0,phase:null,readLeft:0,releasedAt:0,pauseLeft:0,pauseKind:null,fb:null,code:null,registro:null};}
@@ -170,7 +172,7 @@ function renderQuiz(){
   if(blocked){el.innerHTML='<div class="card"><h2>Quiz aberto em outra aba</h2><p>Feche esta aba e continue na aba em que o quiz já está aberto.</p></div>';return;}
   if(!S){el.innerHTML=startHTML();bindStart();return;}
   if(S.status==='end'){el.innerHTML=`<div class="card"><h2>Atividade concluída</h2><p>Parabéns, ${esc(S.nome.split(' ')[0])}! Você concluiu o quiz.</p><p>Nota (acertos na primeira tentativa): <b>${nota()} de ${NQ}</b></p><p>Código de verificação: <b>${S.code}</b></p><button class="btn" id="goRel">Ver relatório</button></div>`;$('#goRel').onclick=()=>show('rel');return;}
-  if(!resumed){el.innerHTML=`<div class="card"><h2>Você tem uma atividade em andamento</h2><p>${esc(S.nome)} · ${esc(S.turma)}</p><button class="btn" id="cont">Continuar</button></div>`;$('#cont').onclick=()=>{resumed=true;fs();if(!S.cur)serve();else renderQuiz();};return;}
+  if(!resumed){el.innerHTML=`<div class="card"><h2>Você tem uma atividade em andamento</h2><p>${esc(S.nome)} · ${esc(S.turma)}</p><button class="btn" id="cont">Continuar</button></div>`;$('#cont').onclick=()=>{resumed=true;sqId();fs();if(!S.cur)serve();else renderQuiz();};return;}
   const c=S.cur;if(!c){serve();return;}
   const q=D.qs[c.q],r=ritmo();
   let h=`<div class="badges"><span class="bdg">Questões vistas: ${S.seen.length} de ${NQ}</span><span class="bdg e">Erros: ${errs()}</span><span class="bdg ${r[1]}">${r[0]}</span></div>`;
@@ -201,7 +203,7 @@ function idOk(){const n=$('#nome').value.trim().replace(/\s+/g,' '),t=$('#turma'
   if(n.split(' ').length<2||n.length<5){$('#serr').textContent='Digite seu nome e sobrenome.';return null;}
   if(!t){$('#serr').textContent='Digite sua turma.';return null;}$('#serr').textContent='';return{n,t};}
 function bindStart(){
-  $('#go').onclick=()=>{const id=idOk();if(!id)return;S=newState(id.n,id.t);resumed=true;fs();serve();};
+  $('#go').onclick=()=>{const id=idOk();if(!id)return;S=newState(id.n,id.t);resumed=true;sqId();sqSend('inicio',{questoes:NQ},true);fs();serve();};
   $('#nsend').onclick=sendWords;
 }
 async function nuvemPub(d){const P=window.parent;if(!P||P===window||!P.SQMural)throw 'sem portal';
@@ -224,7 +226,7 @@ function confirmA(){
   if(S.phase!=='answer'||S.sel==null)return;
   const c=S.cur,q=c.q,ok=c.ord[S.sel]===SEC[q].a,dt=Date.now()-S.releasedAt;
   S.tries[q]=(S.tries[q]||0)+1;if(!(q in S.first))S.first[q]=ok;
-  S.ans.push({q,ok,t:Date.now(),dt});
+  S.ans.push({q,ok,t:Date.now(),dt});sqSend('resposta',{questao:q+1,sequencia:S.serial,correta:ok,tentativa:S.tries[q]});
   if(ok)S.done.push(q);else{if(!S.queue.length)S.queue.push(q);else S.queue.splice(1+rnd(S.queue.length),0,q);}
   S.phase='feedback';S.fb={ok};
   if(!off){
@@ -239,7 +241,7 @@ function pressaOv(){const s=D.secs[D.qs[S.cur.q].s];ovMsg(`<h2>Pausa reflexiva</
 function finish(){
   S.status='end';S.end=Date.now();S.phase=null;
   S.registro=`${S.nome} | ${S.turma} | nota ${nota()}/${NQ} | ${S.ans.length} respostas | ${fmt(S.start)} a ${fmt(S.end)} | ${S.alerts.length} alertas`;
-  S.code=codeOf(S.registro);save();closeOv();
+  S.code=codeOf(S.registro);save();sqSend('conclusao',{nota:nota(),respostas:S.ans.length,erros:errs(),alertas:S.alerts.length,codigo:S.code},true);closeOv();
   if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
   renderQuiz();
 }
