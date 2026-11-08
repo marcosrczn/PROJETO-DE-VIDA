@@ -116,8 +116,9 @@ function sqId(){try{if(window.ServidorQuiz&&S)ServidorQuiz.identificar({nome:S.n
 function alertR(type,msg){if(!running())return;S.alerts.push({t:Date.now(),type});save();sqSend('alerta',{motivo:type});toast(msg||('Alerta registrado: '+type));}
 
 /* ---------- Quiz ---------- */
-function newState(nome,turma){return{nome,turma,start:Date.now(),end:null,status:'run',queue:shuf([...Array(NQ).keys()]),cur:null,serial:0,seen:[],first:{},tries:{},done:[],ans:[],alerts:[],consults:[],pauses:0,reloads:0,fastRun:0,fastTotal:0,phase:null,readLeft:0,releasedAt:0,pauseLeft:0,pauseKind:null,fb:null,code:null,registro:null};}
+function newState(nome,turma){return{nome,turma,start:Date.now(),end:null,status:'run',queue:shuf([...Array(NQ).keys()]),cur:null,serial:0,retry:[],ciclo:1,seen:[],first:{},tries:{},done:[],ans:[],alerts:[],consults:[],pauses:0,reloads:0,fastRun:0,fastTotal:0,phase:null,readLeft:0,releasedAt:0,pauseLeft:0,pauseKind:null,fb:null,code:null,registro:null};}
 function serve(){
+  if(!S.queue.length&&S.retry&&S.retry.length){S.queue=shuf(S.retry);S.retry=[];S.ciclo=(S.ciclo||1)+1;}
   if(!S.queue.length){finish();return;}
   const q=S.queue.shift();
   S.cur={q,ord:shuf([0,1,2]),ret:(S.tries[q]||0)>0};S.serial++;
@@ -127,6 +128,7 @@ function serve(){
   save();renderQuiz();
 }
 function ritmo(){const n=S.ans.length;if(!n)return['Leitura consciente','r'];const p=S.fastTotal/n;return p<.15?['Leitura consciente','r']:p<.35?['Ritmo apressado','r w']:['Leitura apressada','e'];}
+function completo(){return !!S&&S.status==='end'&&new Set(S.done).size===NQ;}
 function nota(){return Object.values(S.first).filter(Boolean).length;}
 function errs(){return S.ans.filter(a=>!a.ok).length;}
 
@@ -134,12 +136,12 @@ function renderQuiz(){
   const el=$('#t-quiz');
   if(blocked){el.innerHTML='<div class="card"><h2>Quiz aberto em outra aba</h2><p>Feche esta aba e continue na aba em que o quiz já está aberto.</p></div>';return;}
   if(!S){el.innerHTML=startHTML();bindStart();return;}
-  if(S.status==='end'){el.innerHTML=`<div class="card"><h2>Atividade concluída</h2><p>Parabéns, ${esc(S.nome.split(' ')[0])}! Você concluiu o quiz.</p><p>Nota (acertos na primeira tentativa): <b>${nota()} de ${NQ}</b></p><p>Código de verificação: <b>${S.code}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="envRes">Enviar resultado ao professor</button><button class="btn sec" id="goRel">Ver relatório</button></div><p id="envMsg" class="err" style="color:var(--ok)">${S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':''}</p></div>`;$('#goRel').onclick=()=>show('rel');$('#envRes').onclick=enviarRes;return;}
+  if(S.status==='end'){el.innerHTML=`<div class="card"><h2>Atividade concluída</h2><p>Parabéns, ${esc(S.nome.split(' ')[0])}! Você concluiu o quiz.</p><p>Nota (acertos na primeira tentativa): <b>${nota()} de ${NQ}</b></p><p>Código de verificação: <b>${S.code}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap">${completo()?'<button class="btn" id="envRes">Enviar resultado ao professor</button>':''}<button class="btn sec" id="goRel">Ver relatório</button></div><p id="envMsg" class="err" style="color:var(--ok)">${S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':''}</p></div>`;$('#goRel').onclick=()=>show('rel');const eb=$('#envRes');if(eb)eb.onclick=enviarRes;return;}
   if(!resumed){el.innerHTML=`<div class="card"><h2>Você tem uma atividade em andamento</h2><p>${esc(S.nome)} · ${esc(S.turma)}</p><button class="btn" id="cont">Continuar</button></div>`;$('#cont').onclick=()=>{resumed=true;sqId();fs();if(!S.cur)serve();else renderQuiz();};return;}
   if(S.nuvem==='pend'&&!S.cur){el.innerHTML=nuvemHTML();$('#nsend').onclick=sendWords;$('#nskip').onclick=()=>{S.nuvem='pulou';save();serve();};return;}
   const c=S.cur;if(!c){serve();return;}
   const q=D.qs[c.q],r=ritmo();
-  let h=`<div class="badges"><span class="bdg">Questões vistas: ${S.seen.length} de ${NQ}</span><span class="bdg e">Erros: ${errs()}</span><span class="bdg ${r[1]}">${r[0]}</span></div>`;
+  let h=`<div class="badges"><span class="bdg">Questões vistas: ${S.seen.length} de ${NQ}</span><span class="bdg e">Erros: ${errs()}</span>${(S.ciclo||1)>1?`<span class="bdg">Ciclo ${S.ciclo} de revisão</span>`:""}<span class="bdg ${r[1]}">${r[0]}</span></div>`;
   h+=`<div class="card"><div class="qn">Questão ${S.serial}${c.ret?'<span class="tag">RETORNO</span>':''}</div><div class="qt">${esc(q.t)}</div>`;
   const chip=(oi,di)=>{const right=S.fb&&off&&!S.fb.ok&&oi===SEC[c.q].a;return `<div class="chip ${S.phase==='feedback'?'dis':''} ${right?'right':''}" data-i="${di}" tabindex="0" role="button"><span class="l">${L[di]})</span><span>${esc(q.o[oi])}</span><span class="g">⋮⋮</span></div>`;};
   h+=`<div class="ins">Arraste para o campo abaixo a alternativa que você considera correta (ou toque nela).</div><div class="drop" id="drop">${S.sel!=null?chip(c.ord[S.sel],S.sel):'Solte aqui a sua resposta'}</div><div id="pool">`;
@@ -170,15 +172,20 @@ function bindChip(ch){const di=+ch.dataset.i,inDrop=!!ch.closest('#drop');
       g.remove();ch.classList.remove('lift');drop.classList.remove('over');
       if(ev.type!=='pointercancel'&&over(ev.clientX,ev.clientY))placeSel(di);else if(inDrop)placeSel(null);};
     window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);};}
+const ALUNOS=["ANA CLARA BATISTA DE OLIVEIRA", "ANA ELIZA FAGUNDES MENEZES", "ANA LIVIA NAZARETH DA SILVA", "ANA LUIZA LUCK RAASCH", "ANGELO GABRIEL NOGUEIRA FAVORETTI", "ANGELO MIGUEL DE ARAUJO VENTURIM", "ANIELY MOREIRA DA SILVA", "BRUNA CARLA GASPAR", "ELLOA SOUZA DE JESUS", "EMANUELLY DE ANGELO BIERNASCHI", "ERIC MOREIRA GLAZAR", "EVELINE FERREIRA DE OLIVEIRA", "HEITOR DA SILVA VESPER", "HEITOR LUIS MIZETE", "ISABELLY DOS SANTOS PEREIRA", "ISADORA DE ALMEIDA NUNES", "IZADORA TONANI", "JOAO SALOMAO FIORENTINI", "KEVEN HENRIQUE GALACHO CARDOSO", "LARA LUBE CORDEIRO", "LUANA BARBOSA PAGEL", "LUIZ MIGUEL GONCALVES PEREIRA", "MARIA EDUARDA HELL DA SILVA", "MIGUEL CEZINI PIRES", "MURILO VIEIRA EMIDIO", "NATHAN KNAACK KOBI", "PEDRO AMADEO DE ARAUJO VENTURIM", "RACHEL MERLO PISKE", "RIHANNA CARLA PINTO DE SOUZA", "STHEFANY FREDERICO WITT", "STHEPHANY PEREIRA SCHNEIDER STORINO", "THAUANY STORCH IZIDORO", "VALENTINA NAZARETH GARCIA NAVA", "WALLACE LOURENCO BATISTA DA SILVA", "YASMIN LUCHT CHIABAI"], TURMA='9º ano';
 function startHTML(){return `<div class="card"><h2>Identificação</h2><p>Atividade individual. Leia cada situação com atenção antes de responder.</p>
-<label class="f">Nome completo</label><input type="text" id="nome" autocomplete="off"><label class="f">Turma</label><input type="text" id="turma" autocomplete="off" placeholder="Ex.: 9º A">
+<label class="f">Escolha o seu nome</label><div style="display:flex;gap:8px"><select id="nome"><option value="">Toque para escolher</option>${ALUNOS.map(n=>`<option>${esc(n)}</option>`).join('')}</select><button class="btn" id="addN" title="Não encontrei meu nome" style="font-size:1.3rem;padding:6px 16px">+</button></div>
+<div id="novoBox" class="hidden"><label class="f">Não encontrou seu nome? Digite seu nome completo</label><input type="text" id="novo" autocomplete="off" maxlength="80"></div>
+<p style="color:var(--mute);font-size:.9rem;margin:8px 0 0">Turma: ${TURMA}</p>
 <div class="err" id="serr"></div><button class="btn" id="go">Começar</button></div>`;}
-function idOk(){const n=$('#nome').value.trim().replace(/\s+/g,' '),t=$('#turma').value.trim();
-  if(n.split(' ').length<2||n.length<5){$('#serr').textContent='Digite seu nome e sobrenome.';return null;}
-  if(!t){$('#serr').textContent='Digite sua turma.';return null;}$('#serr').textContent='';return{n,t};}
+function idOk(){const add=!$('#novoBox').classList.contains('hidden');let n=add?$('#novo').value.trim().replace(/\s+/g,' ').toUpperCase():$('#nome').value;
+  if(!n){$('#serr').textContent=add?'Digite seu nome completo.':'Escolha o seu nome na lista ou toque em +.';return null;}
+  if(add&&(n.split(' ').length<2||n.length<5)){$('#serr').textContent='Digite seu nome e sobrenome.';return null;}
+  $('#serr').textContent='';return{n,t:TURMA,add};}
 function nvJa(){try{return !!localStorage.getItem(K+'_nv');}catch(e){return false;}}
 function bindStart(){
-  $('#go').onclick=()=>{const id=idOk();if(!id)return;S=newState(id.n,id.t);resumed=true;sqId();sqSend('inicio',{questoes:NQ},true);fs();
+  $('#addN').onclick=()=>{const b=$('#novoBox');b.classList.toggle('hidden');const on=!b.classList.contains('hidden');$('#nome').disabled=on;if(on)$('#novo').focus();};
+  $('#go').onclick=()=>{const id=idOk();if(!id)return;S=newState(id.n,id.t);S.addNome=!!id.add;resumed=true;sqId();sqSend('inicio',{questoes:NQ},true);fs();
     if(nvJa())serve();else{S.nuvem='pend';save();renderQuiz();}};
 }
 function nuvemHTML(){return `<div class="card"><div class="qn">Para começar</div><div class="qt">Seja sincero: o que mais te incomoda na nossa escola? Escreva até 3 palavras. Elas vão aparecer na nuvem de palavras da TV.</div>
@@ -207,7 +214,7 @@ function confirmA(){
   const c=S.cur,q=c.q,ok=c.ord[S.sel]===SEC[q].a,dt=Date.now()-S.releasedAt;
   S.tries[q]=(S.tries[q]||0)+1;if(!(q in S.first))S.first[q]=ok;
   S.ans.push({q,ok,t:Date.now(),dt});sqSend('resposta',{questao:q+1,sequencia:S.serial,correta:ok,tentativa:S.tries[q]});
-  if(ok)S.done.push(q);else{if(!S.queue.length)S.queue.push(q);else S.queue.splice(1+rnd(S.queue.length),0,q);}
+  if(ok)S.done.push(q);else{(S.retry=S.retry||[]).push(q);}
   S.phase='feedback';S.fb={ok};
   if(!off){
     if(dt<4000){S.fastRun++;S.fastTotal++;}else S.fastRun=0;
@@ -281,7 +288,7 @@ function stats(){const dts=S.ans.map(a=>a.dt).filter(x=>x>=0);const dur=(S.end||
   return{dur,avg:dts.length?dts.reduce((a,b)=>a+b,0)/dts.length:0,min:dts.length?Math.min(...dts):0,byType,revisar,ac:S.ans.filter(a=>a.ok).length};}
 function relData(){const st=stats(),r=ritmo();const m=Math.floor(st.dur/60000),s=Math.floor(st.dur%60000/1000);
   return{st,blocks:[
-  ['Identificação',[['Estudante',S.nome],['Turma',S.turma],['Situação',S.status==='end'?'Concluído':'Em andamento']]],
+  ['Identificação',[['Estudante',S.nome+(S.addNome?' (nome digitado, fora da lista)':'')],['Turma',S.turma],['Situação',S.status==='end'?'Concluído':'Em andamento']]],
   ['Desempenho',[['Nota (1ª tentativa)',nota()+' de '+NQ],['Total de respostas',S.ans.length],['Acertos',st.ac],['Erros',errs()],['Questões vistas',S.seen.length+' de '+NQ]]],
   ['Tempo e ritmo',[['Início',fmt(S.start)],['Fim',fmt(S.end)],['Duração',m+' min '+s+' s'],['Tempo médio por resposta',secs(st.avg)],['Resposta mais rápida',secs(st.min)],['Respostas apressadas (< 4 s)',S.fastTotal],['Pausas obrigatórias',S.pauses],['Síntese do ritmo',r[0]]]],
   ['Alertas',[['Páginas recarregadas',S.reloads],['Total de alertas',S.alerts.length]].concat(Object.entries(st.byType).map(([k,v])=>['· '+k,v]))]
@@ -293,8 +300,8 @@ function renderRel(){const el=$('#t-rel');if(!S){el.innerHTML='<div class="card"
   h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Questões</h2><table><tr><th>Nº no gabarito</th><th>1ª tentativa</th><th>Tentativas</th><th>Tema</th></tr>${[...Array(NQ).keys()].filter(q=>S.tries[q]).map(q=>`<tr><td>${q+1}</td><td>${S.first[q]?'Acerto':'Erro'}</td><td>${S.tries[q]}</td><td>${esc(D.secs[D.qs[q].s].t)}</td></tr>`).join('')}</table></div>`;
   h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Temas para revisar</h2>${st.revisar.length?'<ul>'+st.revisar.map(s=>`<li>${esc(D.secs[s].t)}</li>`).join('')+'</ul>':'<p>Nenhuma.</p>'}</div>`;
   if(S.status==='end')h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Verificação</h2><p><b>Registro:</b> ${esc(S.registro)}</p><p><b>Código:</b> ${S.code}</p></div>`;
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+(S.status==='end'?'<button class="btn" id="envRes">Enviar resultado ao professor</button>':'')+'</div><p id="envMsg" class="err" style="color:var(--ok)">'+(S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':'')+'</p>';el.innerHTML=h;const er=$('#envRes');if(er)er.onclick=enviarRes;}
-function enviarRes(){const m=$('#envMsg');
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+(completo()?'<button class="btn" id="envRes">Enviar resultado ao professor</button>':'')+'</div><p id="envMsg" class="err" style="color:var(--ok)">'+(S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':'')+'</p>';el.innerHTML=h;const er=$('#envRes');if(er)er.onclick=enviarRes;}
+function enviarRes(){const m=$('#envMsg');if(!completo())return;
   if(!window.ServidorQuiz){m.style.color='var(--bad)';m.textContent='Abra esta atividade pelo QR code do professor para enviar o resultado.';return;}
   const {st,blocks}=relData();
   const rel={titulo:D.titulo,cab:D.cab,blocos:blocks.map(b=>[b[0],b[1].map(x=>[String(x[0]),String(x[1])])]),
@@ -316,10 +323,10 @@ function profMenu(){show('prof');const el=$('#t-prof');
   <button class="btn sec" id="pn">Liberar nova tentativa</button><button class="btn sec" id="ps">Sair do menu</button></div></div>
   <div id="pbody"></div>
   <div class="card"><h2 style="margin-top:0;color:var(--acc)">Funcionamento</h2><ul>
-  <li>O estudante informa nome completo e turma. A atividade é individual.</li>
+  <li>O estudante escolhe o nome na lista do 9º ano; se não encontrar, toca em + e digita (o relatório marca "fora da lista"). O botão "Enviar resultado ao professor" só aparece ao concluir com 100% das questões acertadas. A atividade é individual.</li>
   <li>A ordem das ${NQ} questões é sorteada para cada estudante, e as 3 alternativas são embaralhadas a cada aparição. O estudante responde arrastando a alternativa para o campo (ou tocando nela). O estudante vê a numeração da própria sequência; o número original aparece só aqui, como "Nº no gabarito".</li>
   <li>Cada questão exige 8 s de leitura antes de liberar a resposta. O tempo para com a página em segundo plano e não reinicia ao recarregar.</li>
-  <li>Acerto mostra "Correto!" e um comentário. Erro não mostra a resposta: pede nova leitura e impõe pausa de 20 s. A questão errada volta mais tarde, em posição aleatória, com a etiqueta RETORNO.</li>
+  <li>Acerto mostra "Correto!" e um comentário. Erro não mostra a resposta: pede nova leitura e impõe pausa de 20 s. As questões erradas voltam num novo ciclo, depois que o estudante passa por todas, com a etiqueta RETORNO.</li>
   <li>O quiz só termina quando o estudante acerta todas as questões (essa regra não é informada aos estudantes). Trava de segurança: 300 respostas.</li>
   <li>Nota = acertos na primeira tentativa. Duas respostas seguidas em menos de 4 s geram pausa reflexiva de 20 s.</li>
   <li>Proteções registradas: troca de aba, perda de foco, copiar/colar, botão direito, imprimir, salvar, código-fonte, ferramentas do desenvolvedor, captura de tela, saída da tela cheia, recarga e quiz em mais de uma aba.</li>
