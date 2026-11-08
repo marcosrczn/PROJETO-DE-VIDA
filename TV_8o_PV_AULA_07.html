@@ -267,7 +267,7 @@ addEventListener('resize',fit);
 function fsToggle(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{})}
 if(MODE==='tv'){let tx=null;$('p-slides').addEventListener('touchstart',e=>tx=e.touches[0].clientX);$('p-slides').addEventListener('touchend',e=>{if(tx==null)return;const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>70)sl(d<0?1:-1);tx=null});
 slShow();setTimeout(fit,50);}
-whoBuild();if(MODE==='aluno')tab('nuvem');else{document.body.classList.add('mtv');setTimeout(()=>{tvInit();tvCloud()},0)}
+whoBuild();if(MODE==='aluno')tab('quiz');else{document.body.classList.add('mtv');setTimeout(()=>{tvInit();tvCloud()},0)}
 
 /* ---------- nuvem ---------- */
 function nvURL(){return ''}
@@ -278,21 +278,22 @@ async function nuvemPub(d){const P=window.parent;if(!P||P===window||!P.SQMural)t
   d.cid=cid;
   for(let i=0;i<40;i++){if(sa.conectados()){const n=await sa.enviar('pvnuvem/'+AULA_ID+'/'+cid,Object.assign({},d),true);if(n>0)return n}await new Promise(r=>setTimeout(r,500))}
   throw 'sem conexão'}
+function nvRender(){
+  $('qStart').style.display='none';$('qEnd').style.display='none';$('qBox').style.display='block';topo();
+  $('qCard').innerHTML='<div class="qnum">☁️ Nuvem de palavras</div><div class="qe">Responda com até três palavras: <b>o que é ser protagonista da própria vida?</b> Suas palavras vão aparecer na nuvem da TV.</div>'+
+  '<div class="nv-row"><input type="text" class="nvW" maxlength="25" placeholder="Palavra 1"><input type="text" class="nvW" maxlength="25" placeholder="Palavra 2 (opcional)"><input type="text" class="nvW" maxlength="25" placeholder="Palavra 3 (opcional)"></div>'+
+  '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap"><span id="nvMsg"></span><button class="btn grn" id="nvBtn" onclick="nvEnviar()">Enviar e continuar</button></div>';
+  $('qCard').querySelectorAll('.nvW').forEach(x=>{x.oncopy=x.onpaste=null})}
 async function nvEnviar(){
-  const nome=whoNome('nv'),turma=$('nvTurma').value;
   const ws=[...document.querySelectorAll('.nvW')].map(i=>i.value.trim().toLowerCase()).filter(Boolean);
-  const m=$('nvMsg');
-  if(nome.split(/\s+/).length<2){m.className='err';m.textContent='Escolha seu nome ou toque em + e digite nome e sobrenome.';return}
-  if(!turma){m.className='err';m.textContent='Escolha a turma.';return}
+  const m=$('nvMsg'),b=$('nvBtn');
   if(!ws.length){m.className='err';m.textContent='Digite pelo menos uma palavra.';return}
-  if(lsGet('pv8a07_nuvem_env')){m.className='err';m.textContent='Você já enviou suas palavras.';return}
-  m.className='';m.textContent='Enviando...';
+  m.className='';m.textContent='Enviando...';b.disabled=true;
   try{
-    await nuvemPub({turma,nome,palavras:ws,t:Date.now()});
-    try{if(window.ServidorQuiz){ServidorQuiz.identificar({nome,turma});ServidorQuiz.enviar('nuvem',{turma,nome,palavras:ws},true)}}catch(e){}
-    lsSet('pv8a07_nuvem_env',1);m.className='ok';m.textContent='Enviado! Suas palavras vão aparecer na TV.';
-    document.querySelectorAll('.nvW').forEach(i=>i.value='');
-  }catch(e){m.className='err';m.textContent=e==='sem portal'?'Abra esta atividade pelo QR code do professor.':'Sem conexão com a TV. Confira a internet e tente de novo.'}
+    await nuvemPub({turma:st.turma,nome:st.nome,palavras:ws,t:Date.now()});
+    try{if(window.ServidorQuiz)ServidorQuiz.enviar('nuvem',{turma:st.turma,nome:st.nome,palavras:ws},true)}catch(e){}
+    lsSet('pv8a07_nuvem_env',1);st.nvOk=true;save();proximo();
+  }catch(e){b.disabled=false;m.className='err';m.textContent=e==='sem portal'?'Abra esta atividade pelo QR code do professor.':'Sem conexão com a TV. Confira a internet e tente de novo.'}
 }
 async function nvCarregar(){if(!$('nvFiltro'))return;
   const t=normT($('nvFiltro').value),url=nvURL();let c={};
@@ -353,6 +354,7 @@ function qIniciar(){
   if(AB)document.documentElement.requestFullscreen().catch(()=>{});wasFS=true;proximo();
 }
 function proximo(){
+  if(!st.nvOk&&!lsGet('pv8a07_nuvem_env'))return nvRender();
   if(!st.queue.length||st.answered>=300)return fim();
   const id=st.queue.shift();const ret=st.seq[id]!==undefined;
   if(!ret){st.seen++;st.seq[id]=st.seen}
@@ -361,6 +363,7 @@ function proximo(){
 function ritmo(){const r=st.answered?st.fast/st.answered:0;return r<.15?['Leitura consciente','r1']:r<.35?['Ritmo apressado','r2']:['Leitura apressada','r3']}
 function topo(){$('pVistas').textContent='Questões vistas: '+st.seen+' de '+N;$('pErros').textContent='Erros: '+st.errors;const r=ritmo();$('pRitmo').textContent=r[0];$('pRitmo').className='pill '+r[1]}
 function render(){
+  if(!st.cur)return proximo();
   $('qStart').style.display='none';$('qEnd').style.display='none';$('qBox').style.display='block';topo();
   const c=st.cur,q=Q[c.id];
   let h='<div class="qnum">Questão '+st.seq[c.id]+(c.ret?'<span class="ret">RETORNO</span>':'')+'</div><div class="qe">'+esc(q.e)+'</div>';
