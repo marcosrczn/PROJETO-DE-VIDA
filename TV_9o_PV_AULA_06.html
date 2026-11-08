@@ -24,17 +24,29 @@ aside p{margin:0;font-size:clamp(16px,1.7vw,30px)}
 footer{height:8vh;display:flex;align-items:center;justify-content:space-between;padding:0 2vw;color:var(--mute);font-size:clamp(14px,1.3vw,22px)}
 footer button,footer select{background:transparent;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:inherit;cursor:pointer;margin-left:8px}
 footer select option{background:var(--bg)}
+#capa{position:fixed;inset:0;z-index:20;background:radial-gradient(circle at 30% 20%,#173039,var(--bg) 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4vh 6vw;gap:3vh}
+#capa.off{display:none}
+#capa .k{color:var(--acc);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:clamp(14px,1.5vw,26px)}
+#capa h2{margin:0;font-size:clamp(34px,5.6vw,96px);line-height:1.08}
+#capa .obj{max-width:1300px;border:2px solid var(--line);border-left:8px solid var(--acc);border-radius:16px;padding:2.4vh 2.4vw;text-align:left;background:rgba(255,255,255,.03)}
+#capa .obj b{display:block;color:var(--acc);font-size:clamp(16px,1.6vw,28px);margin-bottom:1vh;text-transform:uppercase;letter-spacing:.08em}
+#capa .obj p{margin:0;font-size:clamp(20px,2.4vw,42px);line-height:1.35}
+#capa button{background:var(--acc);color:#06262b;border:0;border-radius:14px;padding:1.6vh 3vw;font-size:clamp(18px,1.8vw,32px);font-weight:800;cursor:pointer}
 @media (max-width:700px){main{flex-direction:column}aside{width:100%;flex-direction:row}.qrbox svg{width:120px}}
 </style>
 </head>
 <body>
+<div id="capa"><div class="k">Projeto de Vida · 9º ano · Aula 06</div>
+<h2>Se a escola fosse nossa:<br>de reclamar a propor</h2>
+<div class="obj"><b>Objetivo de aprendizagem</b><p>Reconhecer problemas reais da escola e diferenciar reclamar de propor, escolhendo ações possíveis, verificáveis e planejadas para melhorá-la.</p></div>
+<button id="capaGo">Começar a atividade ▶</button></div>
 <header><h1>O que mais te incomoda na nossa escola?</h1><div class="sub">Projeto de Vida · 9º ano · Aula 06 · Se a escola fosse nossa: de reclamar a propor</div></header>
 <main>
-  <aside><div class="qrbox"></div><p>Leia o QR code, preencha nome e turma e envie até 3 palavras.</p><p class="qrurl"></p></aside>
+  <aside><div class="qrbox"></div><p>Leia o QR code, escolha seu nome e envie até 3 palavras.</p><p class="qrurl"></p></aside>
   <div id="stage"><div id="empty">As palavras aparecerão aqui.</div></div>
 </main>
 <footer><span><b id="tot">0 estudantes</b> · <span id="tvCon">conectando...</span></span>
-<span><select id="tvTurma"><option value="">Todas as turmas</option></select><button id="fsb">Tela cheia</button><button id="clr">Limpar nuvem</button><button id="unh">Mostrar ocultas</button></span></footer>
+<span><select id="tvTurma"><option value="">Todas as turmas</option></select><button id="tema">Tema</button><button id="fsb">Tela cheia</button><button id="clr">Limpar nuvem</button><button id="unh">Mostrar ocultas</button></span></footer>
 <script>
 (function(){
 /* Arquivo do quiz dentro da pasta quizzes/ */
@@ -43,6 +55,7 @@ const QUIZ_ARQ='9o_ANO/9o_PV_AULA_06_PROJETOS.html';
 const AULA_ID='pv9a06';
 const COLORS=['#4fc1cf','#f0a35c','#8fd694','#f2d16b','#e38ab5','#9db7ff','#ff8f70','#7fe0c8'];
 const $=id=>document.getElementById(id), stage=$('stage');
+$('capaGo').onclick=()=>{$('capa').classList.add('off');window.dispatchEvent(new Event('resize'));};$('tema').onclick=()=>$('capa').classList.remove('off');
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 const normT=t=>String(t||'').toUpperCase().replace(/[\sº°ª\.\-]/g,'');

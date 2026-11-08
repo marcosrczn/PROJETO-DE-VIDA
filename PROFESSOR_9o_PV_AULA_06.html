@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resultados Aula 06</title>
+<script src="sq-mural.js"></script>
+<style>
+:root{--bg:#f4f7f8;--card:#fff;--ink:#1f2937;--mute:#5b6572;--acc:#0b6b78;--acc2:#e0f1f2;--ok:#1d7a46;--okbg:#e4f5ea;--warn:#9a4d0c;--warnbg:#fdf0e1;--bad:#b3341f;--badbg:#fbe9e5;--line:#d6dde1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111a1e;--card:#18242a;--ink:#e6edf0;--mute:#9fb0b8;--acc:#4fc1cf;--acc2:#18363b;--ok:#5fd18e;--okbg:#173527;--warn:#f0a35c;--warnbg:#3a2a17;--bad:#f08a76;--badbg:#3a1e19;--line:#2c3d44}}
+:root[data-theme="dark"]{--bg:#111a1e;--card:#18242a;--ink:#e6edf0;--mute:#9fb0b8;--acc:#4fc1cf;--acc2:#18363b;--ok:#5fd18e;--okbg:#173527;--warn:#f0a35c;--warnbg:#3a2a17;--bad:#f08a76;--badbg:#3a1e19;--line:#2c3d44}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,"Segoe UI",Arial,sans-serif}
+header{background:var(--acc);color:#fff;padding:16px}
+header h1{margin:0;font-size:1.3rem}header p{margin:2px 0 0;opacity:.9;font-size:.9rem}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pill{padding:5px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-weight:600;font-size:.9rem}
+.pill.on{background:var(--okbg);color:var(--ok)}.pill.off{background:var(--badbg);color:var(--bad)}
+.btn{padding:8px 14px;border-radius:9px;border:0;background:var(--acc);color:#fff;font-weight:600;cursor:pointer;font-size:.9rem}
+.btn.sec{background:var(--acc2);color:var(--ink)}.btn:disabled{opacity:.4;cursor:not-allowed}
+input[type=search]{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:.95rem;min-width:220px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mute);font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;background:var(--card);position:sticky;top:0}
+td.n{font-variant-numeric:tabular-nums}
+.st{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.82rem;font-weight:700}
+.st.ok{background:var(--okbg);color:var(--ok)}.st.run{background:var(--acc2);color:var(--acc)}.st.no{background:var(--warnbg);color:var(--warn)}
+.fora{color:var(--warn);font-size:.8rem;font-weight:600}
+.vazio{padding:28px;text-align:center;color:var(--mute)}
+.nota{color:var(--mute);font-size:.85rem;margin-top:12px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;display:none;z-index:9;max-width:90%}
+</style>
+</head>
+<body>
+<header><h1>Resultados: Se a escola fosse nossa (Aula 06)</h1><p>Projeto de Vida · 9º ano · recebe os dados do quiz dos estudantes em tempo real</p></header>
+<div class="wrap">
+  <div class="bar">
+    <span class="pill off" id="vivo">conectando...</span>
+    <span class="pill" id="cont">0 estudantes</span>
+    <span class="pill" id="cont2">0 concluíram</span>
+    <input type="search" id="busca" placeholder="Procurar estudante">
+    <span style="flex:1"></span>
+    <button class="btn" id="todos">Baixar relatórios de todos</button>
+    <button class="btn sec" id="csv">Baixar planilha (CSV)</button>
+    <button class="btn sec" id="limpar">Limpar lista</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Estudante</th><th>Situação</th><th>Nota (1ª tentativa)</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Alertas</th><th>Último sinal</th><th>Relatório</th></tr></thead><tbody id="lista"></tbody></table>
+  <div class="vazio" id="vazio">Nenhum estudante ainda. Os nomes aparecem aqui quando os estudantes abrirem o quiz pelo QR code da TV.</div></div>
+  <p class="nota">Deixe esta página aberta durante a aula. Os dados ficam guardados neste navegador mesmo se você fechar a página. O relatório completo chega quando o estudante termina com 100% de acertos e toca em "Enviar resultado ao professor". Antes disso, o botão baixa um relatório parcial com o que já foi registrado. Cada arquivo recebe o nome do estudante.</p>
+</div>
+<div id="toast"></div>
+<script>
+(function(){
+var QUIZ_ALVO='9o_PV_AULA_06', NQ=30, KEY='pv9a06_prof';
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fmt(t){return t?new Date(t).toLocaleString('pt-BR'):'-'}
+var tt;function toast(m){var t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(function(){t.style.display='none'},3500)}
+var D={};try{D=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){D={}}
+var sujo=false;function salvar(){sujo=true}
+setInterval(function(){if(!sujo)return;sujo=false;try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}},1500);
+
+function aluno(cid){var a=D[cid];if(!a)a=D[cid]={cid:cid,nome:'',turma:'',inicio:Date.now(),ultimo:Date.now(),resp:[],alertas:[],conclusao:null,resultado:null,reinicios:0};a.ultimo=Date.now();return a}
+function processar(e){
+  if(!e||!e.quiz||String(e.quiz).indexOf(QUIZ_ALVO)<0)return false;
+  var a=aluno(e.cid),d=e.dados||{};
+  switch(e.tipo){
+    case 'ident':if(d.nome)a.nome=String(d.nome).slice(0,120);if(d.turma)a.turma=String(d.turma).slice(0,40);break;
+    case 'inicio':a.inicio=a.inicio||Date.now();break;
+    case 'resposta':a.resp.push({h:Date.now(),q:d.questao,ok:!!d.correta,tent:d.tentativa});if(a.resp.length>400)a.resp.shift();break;
+    case 'alerta':a.alertas.push({h:Date.now(),m:String(d.motivo||'alerta').slice(0,120)});if(/reiniciou/i.test(d.motivo||'')){a.reinicios++;a.resp=[];a.conclusao=null;a.resultado=null}if(a.alertas.length>300)a.alertas.shift();break;
+    case 'conclusao':a.conclusao={h:Date.now(),nota:d.nota,respostas:d.respostas,erros:d.erros,alertas:d.alertas,codigo:d.codigo};break;
+    case 'resultado':a.resultado=d;a.resultado.recebido=Date.now();if(d.nome)a.nome=String(d.nome).slice(0,120);if(d.turma)a.turma=String(d.turma).slice(0,40);toast('Resultado de '+(a.nome||'estudante')+' recebido.');break;
+  }
+  salvar();return true;
+}
+function resumo(a){
+  var first={};a.resp.forEach(function(r){if(r.q!=null&&!(r.q in first))first[r.q]=r.ok});
+  var r=a.resultado,ac=a.resp.filter(function(x){return x.ok}).length;
+  return{nota:r?r.nota:Object.keys(first).filter(function(k){return first[k]}).length,
+    respostas:r?r.respostas:a.resp.length,acertos:r?r.acertos:ac,erros:r?r.erros:a.resp.length-ac,
+    alertas:r?r.alertas:a.alertas.length,
+    sit:r?'ok':a.conclusao?'no':'run'};
+}
+var SIT={ok:'Concluiu e enviou',no:'Concluiu, falta enviar',run:'Em andamento'};
+function nomeDe(a){return a.nome||'(sem nome)'}
+
+/* ---------- tabela ---------- */
+var agendado=false;function desenhar(){if(agendado)return;agendado=true;requestAnimationFrame(function(){agendado=false;render()})}
+function render(){
+  var f=($('busca').value||'').toLowerCase(),ls=Object.keys(D).map(function(k){return D[k]}).filter(function(a){return a.nome||a.resp.length});
+  ls.sort(function(a,b){return nomeDe(a).localeCompare(nomeDe(b),'pt-BR')});
+  $('cont').textContent=ls.length+(ls.length===1?' estudante':' estudantes');
+  $('cont2').textContent=ls.filter(function(a){return a.resultado}).length+' enviaram o resultado';
+  $('vazio').style.display=ls.length?'none':'block';
+  $('lista').innerHTML=ls.filter(function(a){return!f||nomeDe(a).toLowerCase().indexOf(f)>=0}).map(function(a){var s=resumo(a);
+    var fora=a.resultado&&a.resultado.relatorio&&/fora da lista/.test(JSON.stringify(a.resultado.relatorio.blocos||''));
+    return'<tr><td><b>'+esc(nomeDe(a))+'</b>'+(fora?'<br><span class="fora">nome digitado (fora da lista)</span>':'')+(a.reinicios?'<br><span class="fora">reiniciou '+a.reinicios+'x</span>':'')+'</td>'+
+    '<td><span class="st '+s.sit+'">'+SIT[s.sit]+'</span></td><td class="n">'+s.nota+' de '+NQ+'</td><td class="n">'+s.respostas+'</td><td class="n">'+s.acertos+'</td><td class="n">'+s.erros+'</td><td class="n">'+s.alertas+'</td>'+
+    '<td>'+new Date(a.ultimo).toLocaleTimeString('pt-BR')+'</td><td><button class="btn'+(a.resultado?'':' sec')+'" data-cid="'+esc(a.cid)+'">'+(a.resultado?'Baixar relatório':'Baixar parcial')+'</button></td></tr>'}).join('');
+  [].forEach.call(document.querySelectorAll('#lista button'),function(b){b.onclick=function(){baixar(D[b.dataset.cid])}});
+}
+$('busca').oninput=render;
+
+/* ---------- relatório ---------- */
+function nomeArq(s){return String(s||'').replace(/[\\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,90)||'sem nome'}
+function tabela(linhas){return'<table>'+linhas.map(function(x){return'<tr><th>'+esc(x[0])+'</th><td>'+esc(x[1])+'</td></tr>'}).join('')+'</table>'}
+function relHTML(a){
+  var r=a.resultado,rel=r&&r.relatorio,s=resumo(a),h='';
+  if(rel){
+    (rel.blocos||[]).forEach(function(b){h+='<h2>'+esc(b[0])+'</h2>'+tabela(b[1]||[])});
+    h+='<h2>Alertas em ordem cronológica</h2>'+((rel.alertas||[]).length?'<table><tr><th>Horário</th><th>Tipo</th></tr>'+rel.alertas.map(function(x){return'<tr><td>'+esc(x[0])+'</td><td>'+esc(x[1])+'</td></tr>'}).join('')+'</table>':'<p>Nenhum alerta.</p>');
+    if((rel.questoes||[]).length)h+='<h2>Questões</h2><table><tr><th>Nº no gabarito</th><th>1ª tentativa</th><th>Tentativas</th><th>Tema</th></tr>'+rel.questoes.map(function(q){return'<tr><td>'+esc(q[0])+'</td><td>'+esc(q[1])+'</td><td>'+esc(q[2])+'</td><td>'+esc(q[3])+'</td></tr>'}).join('')+'</table>';
+    h+='<h2>Temas para revisar</h2>'+((rel.revisar||[]).length?'<ul>'+rel.revisar.map(function(x){return'<li>'+esc(x)+'</li>'}).join('')+'</ul>':'<p>Nenhum.</p>');
+    if(rel.registro)h+='<h2>Verificação</h2><p><b>Registro:</b> '+esc(rel.registro)+'</p><p><b>Código:</b> '+esc(rel.codigo||r.codigo||'')+'</p>';
+  }else{
+    h+='<p class="aviso">Relatório parcial: o estudante ainda não concluiu com 100% de acertos ou não tocou em "Enviar resultado ao professor".</p>';
+    h+='<h2>Identificação</h2>'+tabela([['Estudante',nomeDe(a)],['Turma',a.turma||'-'],['Situação',SIT[s.sit]]]);
+    h+='<h2>Desempenho até agora</h2>'+tabela([['Nota (1ª tentativa)',s.nota+' de '+NQ],['Respostas',s.respostas],['Acertos',s.acertos],['Erros',s.erros],['Questões diferentes respondidas',new Set(a.resp.map(function(x){return x.q})).size+' de '+NQ],['Reinícios do quiz',a.reinicios],['Primeiro sinal',fmt(a.inicio)],['Último sinal',fmt(a.ultimo)]]);
+    if(a.conclusao)h+='<h2>Conclusão</h2>'+tabela([['Concluído em',fmt(a.conclusao.h)],['Código',a.conclusao.codigo||'-']]);
+    h+='<h2>Alertas</h2>'+(a.alertas.length?'<table><tr><th>Horário</th><th>Tipo</th></tr>'+a.alertas.map(function(x){return'<tr><td>'+fmt(x.h)+'</td><td>'+esc(x.m)+'</td></tr>'}).join('')+'</table>':'<p>Nenhum alerta.</p>');
+    if(a.resp.length)h+='<h2>Respostas em ordem</h2><table><tr><th>Horário</th><th>Nº no gabarito</th><th>Tentativa</th><th>Resultado</th></tr>'+a.resp.map(function(x){return'<tr><td>'+fmt(x.h)+'</td><td>'+esc(x.q)+'</td><td>'+esc(x.tent||'')+'</td><td>'+(x.ok?'Acerto':'Erro')+'</td></tr>'}).join('')+'</table>';
+  }
+  return'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>'+esc(nomeDe(a))+' - Aula 06</title><style>@page{margin:1cm}body{font:14px/1.5 Arial,sans-serif;color:#1f2937;margin:1cm}h1{background:#0b6b78;color:#fff;padding:12px;border-radius:8px;font-size:20px;margin:0 0 4px}h2{color:#0b6b78;font-size:16px;border-bottom:1px solid #d6dde1;padding-bottom:3px;margin-top:18px}table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #e5e9ec;padding:4px 6px;vertical-align:top}th{width:40%;color:#5b6572}.sub{color:#5b6572;margin:0 0 10px}.aviso{background:#fdf0e1;color:#9a4d0c;padding:8px 10px;border-radius:6px}</style></head><body>'+
+    '<h1>Relatório: Se a escola fosse nossa: de reclamar a propor</h1><p class="sub">Projeto de Vida · 9º ano · Aula 06 · '+esc(nomeDe(a))+' · gerado em '+new Date().toLocaleString('pt-BR')+'</p>'+h+'</body></html>';
+}
+function baixar(a){if(!a)return;var b=new Blob([relHTML(a)],{type:'text/html'}),l=document.createElement('a');l.href=URL.createObjectURL(b);l.download=nomeArq(nomeDe(a))+(a.resultado?'':' (parcial)')+'.html';document.body.appendChild(l);l.click();l.remove();setTimeout(function(){URL.revokeObjectURL(l.href)},4000)}
+$('todos').onclick=function(){var ls=Object.keys(D).map(function(k){return D[k]}).filter(function(a){return a.nome||a.resp.length});
+  if(!ls.length){toast('Nenhum estudante na lista.');return}
+  toast('Baixando '+ls.length+' relatórios. Se o navegador perguntar, permita vários downloads.');
+  ls.forEach(function(a,i){setTimeout(function(){baixar(a)},i*400)})};
+$('csv').onclick=function(){var c=function(x){return'"'+String(x==null?'':x).replace(/"/g,'""')+'"'};
+  var ls=Object.keys(D).map(function(k){return D[k]}).filter(function(a){return a.nome||a.resp.length}).sort(function(a,b){return nomeDe(a).localeCompare(nomeDe(b),'pt-BR')});
+  var t='﻿'+['Estudante','Turma','Situação','Nota (1ª tentativa)','Respostas','Acertos','Erros','Alertas','Reinícios','Código'].map(c).join(';')+'\r\n'+
+    ls.map(function(a){var s=resumo(a);return[nomeDe(a),a.turma,SIT[s.sit],s.nota,s.respostas,s.acertos,s.erros,s.alertas,a.reinicios,(a.resultado&&a.resultado.codigo)||(a.conclusao&&a.conclusao.codigo)||''].map(c).join(';')}).join('\r\n');
+  var l=document.createElement('a');l.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));l.download='Resultados Aula 06 - 9o ano.csv';document.body.appendChild(l);l.click();l.remove()};
+$('limpar').onclick=function(){if(confirm('Apagar a lista de estudantes desta página? Baixe os relatórios antes, se precisar.')){D={};try{localStorage.removeItem(KEY)}catch(e){}render()}};
+
+/* ---------- conexão (mesmo canal do portal e do painel do repositório) ---------- */
+if(!window.SQMural){$('vivo').textContent='abra esta página pelo GitHub';render();return}
+var sala=new SQMural.Sala(SQMural.salaPadrao(),null,function(n){var v=$('vivo');v.className='pill '+(n?'on':'off');v.textContent=n?'ao vivo':'conectando...';if(n)anunciar()});
+function anunciar(){sala.enviar('on',{k:'on',t:Date.now()},true)}
+setInterval(anunciar,20000);
+sala.ouvir('a',function(o){
+  if(o.k==='d'){var ids=[],mud=false;(o.itens||[]).forEach(function(it){var meu=false;(it.corpo||[]).forEach(function(e){e.cid=o.cid;if(processar(e))meu=true});if(meu){ids.push(it.id);mud=true}});
+    if(ids.length)sala.enviar('p/'+o.cid,{k:'ack',ids:ids});if(mud)desenhar()}
+  else if(o.k==='hb'&&o.quiz&&String(o.quiz).indexOf(QUIZ_ALVO)>=0&&D[o.cid]){D[o.cid].ultimo=Date.now();salvar();desenhar()}
+});
+render();setInterval(render,15000);
+})();
+</script>
+</body>
+</html>
