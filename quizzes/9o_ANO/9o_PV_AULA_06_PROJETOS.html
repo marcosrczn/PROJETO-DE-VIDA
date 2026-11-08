@@ -171,7 +171,7 @@ function renderQuiz(){
   const el=$('#t-quiz');
   if(blocked){el.innerHTML='<div class="card"><h2>Quiz aberto em outra aba</h2><p>Feche esta aba e continue na aba em que o quiz já está aberto.</p></div>';return;}
   if(!S){el.innerHTML=startHTML();bindStart();return;}
-  if(S.status==='end'){el.innerHTML=`<div class="card"><h2>Atividade concluída</h2><p>Parabéns, ${esc(S.nome.split(' ')[0])}! Você concluiu o quiz.</p><p>Nota (acertos na primeira tentativa): <b>${nota()} de ${NQ}</b></p><p>Código de verificação: <b>${S.code}</b></p><button class="btn" id="goRel">Ver relatório</button></div>`;$('#goRel').onclick=()=>show('rel');return;}
+  if(S.status==='end'){el.innerHTML=`<div class="card"><h2>Atividade concluída</h2><p>Parabéns, ${esc(S.nome.split(' ')[0])}! Você concluiu o quiz.</p><p>Nota (acertos na primeira tentativa): <b>${nota()} de ${NQ}</b></p><p>Código de verificação: <b>${S.code}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="envRes">Enviar resultado ao professor</button><button class="btn sec" id="goRel">Ver relatório</button></div><p id="envMsg" class="err" style="color:var(--ok)">${S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':''}</p></div>`;$('#goRel').onclick=()=>show('rel');$('#envRes').onclick=enviarRes;return;}
   if(!resumed){el.innerHTML=`<div class="card"><h2>Você tem uma atividade em andamento</h2><p>${esc(S.nome)} · ${esc(S.turma)}</p><button class="btn" id="cont">Continuar</button></div>`;$('#cont').onclick=()=>{resumed=true;sqId();fs();if(!S.cur)serve();else renderQuiz();};return;}
   const c=S.cur;if(!c){serve();return;}
   const q=D.qs[c.q],r=ritmo();
@@ -313,7 +313,17 @@ function renderRel(){const el=$('#t-rel');if(!S){el.innerHTML='<div class="card"
   h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Questões</h2><table><tr><th>Nº no gabarito</th><th>1ª tentativa</th><th>Tentativas</th><th>Seção</th></tr>${[...Array(NQ).keys()].filter(q=>S.tries[q]).map(q=>`<tr><td>${q+1}</td><td>${S.first[q]?'Acerto':'Erro'}</td><td>${S.tries[q]}</td><td>${esc(D.secs[D.qs[q].s].t)}</td></tr>`).join('')}</table></div>`;
   h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Seções para revisar</h2>${st.revisar.length?'<ul>'+st.revisar.map(s=>`<li>${esc(D.secs[s].t)}</li>`).join('')+'</ul>':'<p>Nenhuma.</p>'}</div>`;
   if(S.status==='end')h+=`<div class="card"><h2 style="color:var(--acc);margin-top:0">Verificação</h2><p><b>Registro:</b> ${esc(S.registro)}</p><p><b>Código:</b> ${S.code}</p></div>`;
-  h+='<button class="btn" id="relPdf">Relatório em PDF</button>';el.innerHTML=h;$('#relPdf').onclick=relPdf;}
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+(S.status==='end'?'<button class="btn" id="envRes">Enviar resultado ao professor</button>':'')+'<button class="btn sec" id="relPdf">Relatório em PDF</button></div><p id="envMsg" class="err" style="color:var(--ok)">'+(S.enviado?'Resultado enviado em '+fmt(S.enviado)+'.':'')+'</p>';el.innerHTML=h;$('#relPdf').onclick=relPdf;const er=$('#envRes');if(er)er.onclick=enviarRes;}
+function enviarRes(){const m=$('#envMsg');
+  if(!window.ServidorQuiz){m.style.color='var(--bad)';m.textContent='Abra esta atividade pelo QR code do professor para enviar o resultado.';return;}
+  const {st,blocks}=relData();
+  const rel={titulo:D.titulo,cab:D.cab,blocos:blocks.map(b=>[b[0],b[1].map(x=>[String(x[0]),String(x[1])])]),
+    alertas:S.alerts.map(a=>[fmt(a.t),a.type]),
+    questoes:[...Array(NQ).keys()].filter(q=>S.tries[q]).map(q=>[q+1,S.first[q]?'Acerto':'Erro',S.tries[q],D.secs[D.qs[q].s].t]),
+    revisar:st.revisar.map(s=>D.secs[s].t),registro:S.registro,codigo:S.code};
+  sqId();
+  sqSend('resultado',{nome:S.nome,turma:S.turma,nota:nota(),total:NQ,respostas:S.ans.length,acertos:st.ac,erros:errs(),alertas:S.alerts.length,inicio:fmt(S.start),fim:fmt(S.end),codigo:S.code,relatorio:rel},true);
+  S.enviado=Date.now();save();m.style.color='var(--ok)';m.textContent='Resultado enviado ao professor em '+fmt(S.enviado)+'. Se o professor pedir, toque de novo.';}
 async function relPdf(){const {st,blocks}=relData();const w=await pdfWriter(PDFLib);w.title('Relatório do quiz: '+D.titulo,D.cab);
   blocks.forEach(b=>{w.h2(b[0]);b[1].forEach(x=>w.row([String(x[0]),String(x[1])],[.45,.55]));});
   w.h2('Alertas em ordem cronológica');if(!S.alerts.length)w.text('Nenhum alerta.');S.alerts.forEach(a=>w.row([fmt(a.t),a.type],[.3,.7]));
@@ -346,7 +356,7 @@ function profMenu(){show('prof');const el=$('#t-prof');
   <li>O anti-burla desativado volta a ficar ativo ao recarregar a página.</li></ul></div>`;
   $('#pq').onclick=profQs;$('#pr').onclick=()=>show('rel');$('#pc').onclick=profCode;
   $('#pa').onclick=()=>{off=!off;document.documentElement.classList.toggle('nb',!off);$('#banner').style.display=off?'block':'none';if(off&&S){S.pauseLeft=0;S.pauseKind=null;if(S.phase==='read'){S.phase='answer';S.releasedAt=Date.now();}save();closeOv();}profMenu();};
-  $('#pn').onclick=()=>{if(confirm('Apagar o progresso deste navegador e liberar nova tentativa?')){try{localStorage.removeItem(K+'_s');}catch(e){}location.reload();}};
+  $('#pn').onclick=()=>{if(confirm('Apagar o progresso deste navegador e liberar nova tentativa?')){S=null;resumed=false;try{localStorage.removeItem(K+'_s');localStorage.removeItem(K+'_nv');}catch(e){}location.reload();}};
   $('#ps').onclick=()=>show('quiz');}
 function profQs(){const cnt=[0,0,0,0];SEC.forEach(s=>cnt[s.a]++);
   $('#pbody').innerHTML=`<div class="card"><p><b>Respostas por letra:</b> ${cnt.map((n,i)=>L[i]+' = '+n).join(' · ')}</p><input type="text" id="pf" placeholder="Filtrar questões"></div><div id="pl"></div>`;
