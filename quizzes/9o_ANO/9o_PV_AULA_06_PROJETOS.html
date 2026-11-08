@@ -234,7 +234,7 @@ function finish(){
 }
 function fnv(s,h){for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h>>>0;}
 function codeOf(r){const s='pv9a06|'+r.trim();const a=fnv(s,2166136261).toString(16).padStart(8,'0').toUpperCase(),b=fnv(s,0x9747b28c).toString(16).padStart(8,'0').toUpperCase();return 'PV9-'+a.slice(0,4)+'-'+b.slice(0,4);}
-function fs(){if(off)return;const d=document.documentElement;if(d.requestFullscreen&&!document.fullscreenElement)d.requestFullscreen().catch(()=>{});}
+function fs(){}
 
 /* ---------- Relógio ---------- */
 let lastSave=0;
@@ -271,7 +271,6 @@ document.addEventListener('keydown',e=>{if(off)return;const k=(e.key||'').toLowe
 document.addEventListener('keyup',e=>{if(!off&&(e.key||'').toLowerCase()==='printscreen'){try{navigator.clipboard.writeText('');}catch(x){}alertR('Captura de tela','Captura de tela registrada.');}});
 window.addEventListener('beforeprint',()=>alertR('Imprimir','Impressão bloqueada.'));
 let dtOpen=false;setInterval(()=>{const o=(window.outerWidth-window.innerWidth>200)||(window.outerHeight-window.innerHeight>260);if(o&&!dtOpen)alertR('Possível abertura das ferramentas do desenvolvedor','Ferramentas do desenvolvedor detectadas.');dtOpen=o;},1500);
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&running()&&S.status==='run'){alertR('Saída da tela cheia','Saída da tela cheia registrada.');ovMsg('<h2>Você saiu da tela cheia</h2><p>O evento foi registrado.</p><button class="btn" id="bfs">Voltar à tela cheia</button>');$('#bfs').onclick=()=>{closeOv();fs();if(S.pauseKind==='pressa')pressaOv();};}});
 
 /* ---------- Várias abas ---------- */
 const bc=('BroadcastChannel' in window)?new BroadcastChannel(K):null;let checking=true;
@@ -329,7 +328,7 @@ function profMenu(){show('prof');const el=$('#t-prof');
   <li>Acerto mostra "Correto!" e um comentário. Erro não mostra a resposta: pede nova leitura e impõe pausa de 20 s. As questões erradas voltam num novo ciclo, depois que o estudante passa por todas, com a etiqueta RETORNO.</li>
   <li>O quiz só termina quando o estudante acerta todas as questões (essa regra não é informada aos estudantes). Trava de segurança: 300 respostas.</li>
   <li>Nota = acertos na primeira tentativa. Duas respostas seguidas em menos de 4 s geram pausa reflexiva de 20 s.</li>
-  <li>Proteções registradas: troca de aba, perda de foco, copiar/colar, botão direito, imprimir, salvar, código-fonte, ferramentas do desenvolvedor, captura de tela, saída da tela cheia, recarga e quiz em mais de uma aba.</li>
+  <li>Proteções registradas: troca de aba, perda de foco, copiar/colar, botão direito, imprimir, salvar, código-fonte, ferramentas do desenvolvedor, captura de tela, recarga e quiz em mais de uma aba.</li>
   <li>O progresso fica salvo no navegador. Ao concluir, o relatório gera um código de verificação a partir da linha "Registro".</li>
   <li>O anti-burla desativado volta a ficar ativo ao recarregar a página.</li></ul></div>`;
   $('#pq').onclick=profQs;$('#pr').onclick=()=>show('rel');$('#pc').onclick=profCode;
