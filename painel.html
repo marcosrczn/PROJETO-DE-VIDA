@@ -304,6 +304,12 @@ tr.linha{cursor:pointer}
 </style>
 </head>
 <body>
+<div id="trava" style="position:fixed;inset:0;z-index:99999;background:#0f1a1f;display:flex;align-items:center;justify-content:center;font-family:system-ui,Arial,sans-serif"><form id="travaF" style="background:#fff;padding:28px;border-radius:14px;text-align:center;min-width:280px"><h2 style="margin:0 0 14px">Painel do professor</h2><input id="travaS" type="password" placeholder="Senha" autofocus style="font-size:18px;padding:10px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:8px"><p id="travaE" style="color:#b3341f;min-height:1.2em;margin:8px 0"></p><button style="font-size:17px;padding:10px 24px;border:0;border-radius:8px;background:#0b6b78;color:#fff;cursor:pointer">Entrar</button></form></div>
+<script>(function(){var H='295b57d4dad794d6d6570a1d473825856912dc32319c03eeda20989666b051a4',T=document.getElementById('trava');
+try{if(sessionStorage.getItem('pv_painel_ok')===H){T.remove();return}}catch(e){}
+document.getElementById('travaF').onsubmit=function(e){e.preventDefault();var v=document.getElementById('travaS').value;
+crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)).then(function(b){var h=Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0')}).join('');
+if(h===H){try{sessionStorage.setItem('pv_painel_ok',H)}catch(e){}T.remove()}else{document.getElementById('travaE').textContent='Senha incorreta.';document.getElementById('travaS').select()}})}})();</script>
 <header>
   <div class="topo vidro">
     <h1>Painel do professor <span class="vivo off" id="vivo" title="Murais conectados"><i></i><span>conectando…</span></span></h1>
