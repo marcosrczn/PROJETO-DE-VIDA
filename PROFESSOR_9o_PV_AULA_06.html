@@ -34,6 +34,8 @@ td.n{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
+<div id="trava" style="position:fixed;inset:0;z-index:9999;background:#0f1a1f;display:flex;align-items:center;justify-content:center;font-family:system-ui,Arial,sans-serif"><form id="travaF" style="background:#fff;padding:28px;border-radius:14px;text-align:center;min-width:280px"><h2 style="margin:0 0 14px">Painel do professor</h2><input id="travaS" type="password" placeholder="Senha" autofocus style="font-size:18px;padding:10px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:8px"><p id="travaE" style="color:#b3341f;min-height:1.2em;margin:8px 0"></p><button style="font-size:17px;padding:10px 24px;border:0;border-radius:8px;background:#0b6b78;color:#fff;cursor:pointer">Entrar</button></form></div>
+<script>document.getElementById('travaF').onsubmit=function(e){e.preventDefault();if(document.getElementById('travaS').value==='epistemologia'){document.getElementById('trava').remove();}else{document.getElementById('travaE').textContent='Senha incorreta.';}};</script>
 <header><h1>Resultados: Se a escola fosse nossa (Aula 06)</h1><p>Projeto de Vida · 9º ano · recebe os dados do quiz dos estudantes em tempo real</p></header>
 <div class="wrap">
   <div class="bar">
